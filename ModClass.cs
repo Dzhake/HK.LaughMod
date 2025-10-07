@@ -1,13 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Reflection;
 using JetBrains.Annotations;
 using Modding;
 using Modding.Utils;
 using UnityEngine;
-using UnityEngine.SceneManagement;
+using Satchel;
+using Satchel.Futils;
+using GlobalEnums;
 
 namespace LaughMod
 {
@@ -28,6 +29,7 @@ namespace LaughMod
         public Settings OnSaveGlobal() => GS;
 
         public static AudioClip LaughClip;
+        public static float lastPlayTime = float.MinValue;
         public static AudioSource Source;
 
         public LaughMod() : base("LaughMod")
@@ -68,7 +70,7 @@ namespace LaughMod
             return result;
         }
 
-        public bool ToggleButtonInsideMenu { get; } = true;
+        public bool ToggleButtonInsideMenu => true;
 
 
         public static void Play(LaughTrigger trigger)
@@ -79,31 +81,57 @@ namespace LaughMod
 
         public static void Play()
         {
+            if (Time.time < lastPlayTime + LaughClip.length) return; //Prevent audio overlap.
+            lastPlayTime = Time.time;
             HeroController.instance.gameObject.GetOrAddComponent<AudioSource>().PlayOneShot(LaughClip);
         }
 
         public override void Initialize()
         {
+            if (ModHooks.GetMod("Satchel") == null)
+            {
+                LogError("Mod 'Satchel' is required, and is not enabled!");
+                throw new Exception("Mod 'Satchel' is required, and is not enabled!");
+            }
             LaughClip = AudioUtils.LoadAudioClip(Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location)!, "laugh.wav"));
-            ModHooks.BeforePlayerDeadHook += () => Play(LaughTrigger.PlayerDeath);
-            On.HeroController.TakeMP += OnTakeMP;
-            ModHooks.HeroUpdateHook += HeroUpdate;
+            //ModHooks.BeforePlayerDeadHook += () => Play(LaughTrigger.PlayerDeath);
+            //ModHooks.HeroUpdateHook += HeroUpdate;
+            On.PlayMakerFSM.Awake += FSMAwake;
+            On.HeroController.TakeDamage += TakeDamage;
         }
 
-        public static void HeroUpdate()
+        /*public static void HeroUpdate()
         {
             if (Input.GetKeyDown(KeyCode.O))
-            {
                 Play(LaughTrigger.FlowerBreak);
+        }*/
+
+        public static void FSMAwake(On.PlayMakerFSM.orig_Awake orig, PlayMakerFSM fsm)
+        {
+            if (fsm.name == "Knight" && fsm.FsmName == "Spell Control")
+            {
+                var noSoulState = fsm.AddState("LAUGH_MOD_NO_SOUL");
+                fsm.ChangeTransition("Can Cast? QC", "CANCEL", "LAUGH_MOD_NO_SOUL");
+                fsm.ChangeTransition("Can Cast?", "CANCEL", "LAUGH_MOD_NO_SOUL");
+                noSoulState.AddAction(new CustomFsmAction(() => Play(LaughTrigger.NoSoulCast)));
+                noSoulState.AddTransition("FINISHED", "Inactive");
+                
+                var damagedState = fsm.AddState("LAUGH_MOD_DAMAGED");
+                fsm.ChangeTransition("Reset Cam Zoom", "FINISHED", "LAUGH_MOD_DAMAGED");
+                damagedState.AddAction(new CustomFsmAction(() =>
+                {
+                    if (HeroController.instance.cState.focusing) Play(LaughTrigger.DamageWhileFocusing);
+                }));
+                damagedState.AddTransition("FINISHED", "Cancel All");
             }
+            orig(fsm);
         }
 
-        public static void OnTakeMP(On.HeroController.orig_TakeMP orig, HeroController self, int amount)
+
+        public static void TakeDamage(On.HeroController.orig_TakeDamage orig, HeroController self, GameObject go, CollisionSide damageSide, int damageAmount, int hazardType)
         {
-            Instance.Log(self.playerData.GetInt("MPCharge"));
-            if (self.playerData.GetInt("MPCharge") <= 0)
-                Play(LaughTrigger.NoSoulCast);
-            orig(self, amount);
+            if (hazardType != 0 && hazardType != 1) Play(LaughTrigger.EnvironmentalDamage); //HKM https://discord.com/channels/879125729936298015/879129307157528576/1321501476568432733
+            orig(self, go, damageSide, damageAmount, hazardType);
         }
     }
 }
