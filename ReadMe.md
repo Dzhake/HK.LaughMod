@@ -1,12 +1,14 @@
 # LaughMod
 
-Mod that plays "laugh.wav" on specific events. Current events:
+Plays laugh clip on specific events.  
+Put any valid WAV file in "<Mod dirirectory>/LaughClips" (non-recursive), and the mod should read them, and play random one.  
+Current events:
 
 1. Player tries to cast/quick cast with no soul.
 2. Player takes damage while focusing.
 3. Player takes damage from environment.
 
-Made by Dzhake, with help from:
-Jamie (manicjamie)
-BadMagic (badmagic)
-peekagrub (peekagrub).
+Made by Dzhake, with help from:  
+Jamie (manicjamie)  
+BadMagic (badmagic)  
+peekagrub (peekagrub).  
