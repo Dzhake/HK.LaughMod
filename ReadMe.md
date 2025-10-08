@@ -6,4 +6,7 @@ Mod that plays "laugh.wav" on specific events. Current events:
 2. Player takes damage while focusing.
 3. Player takes damage from environment.
 
-Made by Dzhake.
+Made by Dzhake, with help from:
+Jamie (manicjamie)
+BadMagic (badmagic)
+peekagrub (peekagrub).

@@ -18,19 +18,24 @@ namespace LaughMod
 
         public static LaughMod Instance;
 
+        public static System.Random RNG;
+
         public override string GetVersion() => "1.0.0";
 
         public void OnLoadGlobal(Settings s)
         {
+            if (s.Enabled is null || s.Enabled.Length != GS.Enabled.Length)
+            {
+                for (int i = 0; i < GS.Enabled.Length; i++) GS.Enabled[i] = true; //enable all by default
+                return;
+            }
             GS = s;
-            if (GS.Enabled is null) GS = new();
         }
 
         public Settings OnSaveGlobal() => GS;
 
-        public static AudioClip LaughClip;
-        public static float lastPlayTime = float.MinValue;
-        public static AudioSource Source;
+        public static AudioClip[] LaughClips;
+        public static float clipStopTime;
 
         public LaughMod() : base("LaughMod")
         {
@@ -57,14 +62,14 @@ namespace LaughMod
             }
         };
 
-        public static readonly string[] Descs = [ "Player dies", "Player takes damage from environment", "Player takes damage while focusing", "Player tries to cast a spell with not enough SOUL", "Delicate flower breaks", "Grub reveals itself to be a mimic" ];
+        public static readonly string[] Descs = [ "Player takes damage from environment", "Player takes damage while focusing", "Player tries to cast a spell with not enough SOUL", "Delicate flower breaks"];
 
         public List<IMenuMod.MenuEntry> GetMenuData(IMenuMod.MenuEntry? toggleButtonEntry)
         {
             List<IMenuMod.MenuEntry> result = new();
             if (GS is null) LogWarn("GS IS NULL");
             if (GS.Enabled is null) LogWarn("GS.ENABLED IS NULL");
-            for (int i = 0; i <= (int)LaughTrigger.GrubMimic; i++)
+            for (int i = 0; i <= (int)LaughTrigger.FlowerBreak; i++)
                 result.Add(BoolMenuEntry(i, ((LaughTrigger)i).ToString(), Descs[i]));
 
             return result;
@@ -81,9 +86,10 @@ namespace LaughMod
 
         public static void Play()
         {
-            if (Time.time < lastPlayTime + LaughClip.length) return; //Prevent audio overlap.
-            lastPlayTime = Time.time;
-            HeroController.instance.gameObject.GetOrAddComponent<AudioSource>().PlayOneShot(LaughClip);
+            if (Time.time < clipStopTime) return; //Prevent audio overlap.
+            AudioClip laughClip = LaughClips[RNG.Next(0, LaughClips.Length)];
+            clipStopTime = Time.time + laughClip.length;
+            HeroController.instance.gameObject.GetOrAddComponent<AudioSource>().PlayOneShot(laughClip);
         }
 
         public override void Initialize()
@@ -93,8 +99,15 @@ namespace LaughMod
                 LogError("Mod 'Satchel' is required, and is not enabled!");
                 throw new Exception("Mod 'Satchel' is required, and is not enabled!");
             }
-            LaughClip = AudioUtils.LoadAudioClip(Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location)!, "laugh.wav"));
-            //ModHooks.BeforePlayerDeadHook += () => Play(LaughTrigger.PlayerDeath);
+
+            RNG = new();
+            string dir = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location)!, "LaughClips");
+            if (!Directory.Exists(dir))
+            {
+                LogError($"Directory {dir} not found!");
+                return;
+            }
+            LaughClips = AudioUtils.LoadAudioClips(dir);
             //ModHooks.HeroUpdateHook += HeroUpdate;
             On.PlayMakerFSM.Awake += FSMAwake;
             On.HeroController.TakeDamage += TakeDamage;

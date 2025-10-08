@@ -2,5 +2,5 @@ namespace LaughMod;
 
 public class Settings
 {
-    public bool[] Enabled = new bool[(int)LaughTrigger.GrubMimic + 1];
+    public bool[] Enabled = new bool[(int)LaughTrigger.FlowerBreak + 1];
 }
